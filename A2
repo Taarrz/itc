@@ -1,0 +1,110 @@
+#define button1 2
+#define button2 11
+#define button3 12
+#define LED1 5
+#define LED2 6
+#define LED3 7
+
+long long int timeRed = 0;
+long long int timeYellow = 0;
+long long int timeGreen = 0;
+
+long long int deBounceRed = 0;
+long long int deBounceYellow = 0;
+long long int deBounceGreen = 0;
+
+int lastButtonStateRed = 1;
+int lastButtonStateYellow = 0;
+int lastButtonStateGreen = 1;
+
+bool buttonRed = false;
+bool buttonYellow = false;
+bool buttonGreen = false;
+
+int count = 0;
+
+
+void setup() {
+  // put your setup code here, to run once:
+  pinMode(button1, INPUT);
+  pinMode(button2, INPUT);
+  pinMode(button3, INPUT_PULLUP);
+  pinMode(LED1, OUTPUT);
+  pinMode(LED2, OUTPUT);
+  pinMode(LED3, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  // put your main code here, to run repeatedly:
+
+  int buttonpressed1 = digitalRead(button1);
+  int buttonpressed2 = digitalRead(button2);
+  int buttonpressed3 = digitalRead(button3);
+
+  //Red
+  if (buttonpressed1 == LOW && lastButtonStateRed == HIGH) {
+    deBounceRed=millis();
+    buttonRed = true ;
+    
+  }
+  
+  if (buttonRed) {
+    if((millis()-deBounceRed)>150){
+    digitalWrite(LED1, !digitalRead(LED1));
+    timeRed = millis();
+    buttonRed = false ;
+    }
+  }
+  lastButtonStateRed = buttonpressed1;
+ 
+
+  if (millis() - timeRed >= 3000) {
+    digitalWrite(LED1, LOW);
+    deBounceRed=0;
+  }
+  
+
+  //Green
+  if (buttonpressed3 == LOW && lastButtonStateGreen == HIGH && digitalRead(LED1) == LOW) {
+    buttonGreen = true;
+    deBounceGreen=millis();
+  }
+  if (buttonGreen) {
+    if((millis()-deBounceGreen)>150){
+      digitalWrite(LED3, !digitalRead(LED3));
+      buttonGreen = false;
+      timeGreen = millis();
+    }
+  }
+  lastButtonStateGreen = buttonpressed3;
+  if (millis() - timeGreen >= 3000) {
+    digitalWrite(LED3, LOW);
+    deBounceGreen=0;
+  }
+
+  //Yellow
+  if (buttonpressed2 == HIGH && lastButtonStateYellow == LOW && digitalRead(LED1) == LOW && digitalRead(LED3) == LOW && !buttonYellow) {
+    buttonYellow = true;
+    timeYellow = millis();
+    deBounceYellow=millis();
+    digitalWrite(LED2, HIGH);
+  }
+  if (buttonYellow) {
+    if((millis()-deBounceYellow)>150){
+      if (millis() - timeYellow>= 500) {
+        digitalWrite(LED2, !digitalRead(LED2));
+        count++;
+        timeYellow = millis();
+        Serial.println(count);
+      }
+    }
+  }
+  lastButtonStateYellow = buttonpressed2;
+  if (count == 3) {
+    digitalWrite(LED2, LOW);
+    buttonYellow = false;
+    count = 0;
+    deBounceYellow=0;
+  }
+}
