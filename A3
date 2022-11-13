@@ -1,0 +1,93 @@
+#define a 2
+#define b 3
+#define c 4
+#define DP 5
+#define d 6
+#define e 7
+#define f 8
+#define g 9
+#define nownumberSwitch 13
+#define checknumberSwitch 12
+int numPins = 8 ;
+int nownumber = 0 ;
+int segmentPins[8] = {a, b, c, d, e, f, g, DP};
+int randomNumber;
+int bitPattern[10] = {B00000011, B10011111, B00100101, B00001101, B10011001, B01001001, B01000001, B00011111, B00000001, B00001001};
+bool donownumber = false;
+int Lastbottonstatenum = 1;
+int Lastbottonstatecheck = 1;
+long long int debouncetime = 0;
+
+void setup() {
+  pinMode(nownumberSwitch, INPUT_PULLUP);
+  pinMode(checknumberSwitch, INPUT_PULLUP);
+  randomSeed(analogRead(A0));
+  randomNumber = random(0, 9);
+  for (int i = 0; i < numPins; i++) {
+    pinMode(segmentPins[i], OUTPUT);
+  }
+}
+
+void loop() {
+  bool isBitset;
+  int SwitchState=digitalRead(nownumberSwitch);
+  if ( SwitchState== LOW && Lastbottonstatenum == HIGH) {
+    debouncetime = millis();
+    donownumber=true;
+  }
+  if (digitalRead(nownumberSwitch)==LOW && donownumber) {
+    if (millis() - debouncetime > 100) {
+      nownumber = nownumber + 1;
+      if (nownumber == 10) {
+        nownumber = 0;
+      }
+      donownumber=false;
+    }
+  }
+
+  Lastbottonstatenum = SwitchState;
+
+
+  for (int i = 0; i < numPins; i++) {
+    isBitset = bitRead(bitPattern[nownumber], i);
+    digitalWrite(segmentPins[7 - i], isBitset);
+  }
+
+  if (digitalRead(checknumberSwitch) == LOW) {
+    if (nownumber == randomNumber) {
+      for (int i = 0; i < numPins; i++) {
+        digitalWrite(segmentPins[i], 1);
+      }
+      for (int x = 0; x < 3; x++) {
+        for (int i = 0; i < numPins - 2; i++) {
+          digitalWrite(segmentPins[i], 0);
+          delay(100);
+          digitalWrite(segmentPins[i], 1);
+        }
+        nownumber = 0;
+        randomSeed(analogRead(A0));
+        randomNumber = random(0, 9);
+      }
+    }
+
+    else if (nownumber > randomNumber) {
+      int higherG = B01000010;
+      for (int i = 0; i < numPins; i++) {
+        isBitset = bitRead(higherG, i);
+        digitalWrite(segmentPins[7 - i], isBitset);
+      }
+      delay(500);
+    }
+
+    else if (nownumber < randomNumber) {
+      int lowerL = B11100010;
+      for (int i = 0; i < numPins; i++) {
+        isBitset = bitRead(lowerL, i);
+        digitalWrite(segmentPins[7 - i], isBitset);
+      }
+      delay(500);
+    }
+  }
+
+
+}
