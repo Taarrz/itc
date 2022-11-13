@@ -1,0 +1,207 @@
+#include <SPI.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#define start_button 4
+#define silde_pot A1
+
+#define SCREEN_WIDTH 128 // OLED display width, in pixels
+#define SCREEN_HEIGHT 32 // OLED display height, in pixels
+
+// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
+// The pins for I2C are defined by the Wire-library.
+// On an arduino UNO:       A4(SDA), A5(SCL)
+// On an arduino MEGA 2560: 20(SDA), 21(SCL)
+// On an arduino LEONARDO:   2(SDA),  3(SCL), ...
+#define OLED_RESET     -1 // Reset pin # (or -1 if sharing Arduino reset pin)
+#define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
+Adafruit_SSD1306 OLED(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+#define NUMFLAKES     10 // Number of snowflakes in the animation example
+
+int tablesizex = 2, tablesizey = 8;
+int pongdirectionx = -1, pongdirectiony = 1, buffpongx = 0, buffpongy = 0;
+bool isdotout = true, playgame = false, gamepause = false;
+struct ddot {
+  int dotx;
+  int doty;
+  bool ishit;
+};
+ddot drawdot[30];
+void setup() {
+  randomSeed(analogRead(A0));
+  OLED.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  pinMode(A1, INPUT);
+  pinMode(11, OUTPUT);
+  pinMode(start_button, INPUT_PULLUP);
+}
+int pongx = 64;
+int pongy = random(1, 32);
+int dothitcount = 0, Level = 1;
+int HP = 5,score = 0,bufftabley=0;
+bool ischangetable=true;
+void loop() {
+  OLED.setTextColor(WHITE);
+  OLED.setTextSize(1);
+  int start = digitalRead(start_button);
+  int tableyy = analogRead(silde_pot);
+  if (abs(tableyy-bufftabley)>=30){
+   ischangetable=true;
+  }
+  if(ischangetable==true){
+  bufftabley=tableyy;
+  ischangetable=false;
+  }
+  int tabley=bufftabley;
+  tabley = map(tabley, 0, 1023, 0, 32 - tablesizey);
+  if (playgame == false) {
+    OLED.clearDisplay();
+    OLED.setCursor(32, 16);
+    OLED.print("Presstostart");
+    if (start == 0) {
+      OLED.clearDisplay();
+      OLED.setCursor(32, 20);
+      OLED.print("Start in ");
+      OLED.display();
+      delay(500);
+      for (int i = 0; i < 3; i++) {
+        OLED.setCursor(64, 20);
+        OLED.clearDisplay();
+        OLED.print(3 - i);
+        OLED.display();
+        tone(11, 30, 200);
+        delay(1000);
+      }
+      playgame = true;
+    }
+  }
+  if (playgame == true) {
+    OLED.clearDisplay();
+    draw_dot();
+    OLED. drawRect(3, tabley, tablesizex, tablesizey, WHITE);
+    draw_pong();
+    if (pongy <= 1 || pongy >= 32) {
+      tone(11, 30, 200);
+      pongdirectiony *= -1;
+    }
+    if ((pongx == 3 + tablesizex && pongy >= tabley && pongy <= tabley + tablesizey) || (pongx > 99)) {
+      tone(11, 30, 200);
+      pongdirectionx *= -1;
+    }
+    else if (pongx < 3 && HP > 0) {
+      tone(11, 50, 200);
+      pongx = 29;
+      pongy = random(1, 32);
+      HP -= 1;
+      if (HP > 0) {
+        gamepause = true;
+        buffpongx = pongdirectionx;
+        buffpongy = pongdirectiony;
+        while (gamepause == true) {
+          int game_continue = digitalRead(start_button);
+          pongdirectionx = 0;
+          pongdirectiony = 0;
+          OLED.setCursor(5, 5);
+          OLED.print("Presstocontinue");
+          OLED.setCursor(10,25);
+          OLED.print("HP:"); OLED.print(HP);OLED.print("/5");
+          OLED.display();
+          if (game_continue == 0) {
+            gamepause = false;
+          }
+        }
+        if (gamepause == false) {
+          pongdirectionx = (abs( buffpongx)); pongdirectiony = (abs( buffpongy));
+          draw_pong();
+        }
+      }
+      else {
+        end_game();
+      }
+    }
+    for (int i = 0; i < 30; i++) { //sound
+      //ifhit
+      if ((pongx - 1 <= drawdot[i].dotx && pongx + 1 >= drawdot[i].dotx) && (pongy - 1 <= drawdot[i].doty && pongy + 1 >= drawdot[i].doty) && drawdot[i].ishit == false) {
+        drawdot[i].ishit = true;
+        tone(11, 30, 200);
+        score++;
+        dothitcount++;
+        if ((pongx <= drawdot[i].dotx && pongy >= drawdot[i].doty) || ((pongx > drawdot[i].dotx && pongy >= drawdot[i].doty))) {
+          pongdirectionx *= -1;
+        }
+        else if ((pongx >= drawdot[i].dotx && pongy >= drawdot[i].doty) || (pongx > drawdot[i].dotx && pongy <= drawdot[i].doty)) {
+          pongdirectionx *= -1;
+        }
+        else if ((pongx <= drawdot[i].dotx && pongy < drawdot[i].doty) || (pongx >= drawdot[i].dotx && pongy < drawdot[i].doty)) {
+          pongdirectiony *= -1;
+        }
+        else {
+          pongdirectiony *= -1;
+        }
+      }
+    }
+    if (dothitcount >= 25) {
+      int skipLV = digitalRead(start_button);
+      OLED.setCursor(5, 5);
+      OLED.print("Presstoskiplevel");
+      if (skipLV == 0) {
+        dothitcount = 30;
+        for (int i = 0; i < 30; i++) {
+          drawdot[i].ishit = true;
+        }
+      }
+    }
+    //lvup
+    if (dothitcount == 30) {
+      isdotout = true;
+      pongdirectiony = -(abs( pongdirectiony) + 1);
+      dothitcount = 0;
+      Level = Level + 1;
+    }
+    OLED.setCursor(100, 0);
+    OLED.print("LV:"); OLED.print(Level);
+    OLED.setCursor(100, 10);
+    OLED.print("HP:"); OLED.print(HP);
+    OLED.setCursor(100, 20);
+    OLED.print("P:"); OLED.print(score);
+  }
+  OLED.display();
+}
+void draw_pong() {
+  OLED.drawCircle(pongx, pongy, 1, WHITE);
+  pongx += pongdirectionx;
+  pongy += pongdirectiony;
+  Serial.println(pongy);
+}
+void draw_dot() {
+  if (isdotout == true) {
+    for (int i = 0; i < 30; i++) {
+      drawdot[i].dotx = random(60, 98);
+      drawdot[i].doty = random(2, 31);
+      drawdot[i].ishit = false;
+    }
+    isdotout = false;
+  }
+  for (int i = 0; i < 30; i++) {
+    if (drawdot[i].ishit == false) {
+      OLED.drawPixel(drawdot[i].dotx, drawdot[i].doty, WHITE);
+    }
+  }
+}
+void end_game() {
+  OLED.clearDisplay();
+  HP = 5;
+  Level = 1;
+  dothitcount = 0;
+  isdotout = true;
+  pongdirectionx = -1;
+  pongdirectiony = 1;
+  playgame = false;
+  OLED.setCursor(32, 16);
+  OLED.print("GameOver");
+  OLED.setCursor(32, 24);
+  OLED.print("Score="); OLED.print(score);
+  OLED.display();
+  delay(3000);
+  score = 0;
+}
